@@ -1,0 +1,36 @@
+<idea-plugin>
+    <id>com.ztianzeng.contextlens</id>
+    <name>ContextLens</name>
+    <vendor email="tianzeng@example.com">ContextLens</vendor>
+
+    <description><![CDATA[ContextLens 将 IDE 中的单个文件上下文打包交给 Codex，返回可跳转的洞察卡片并通过 React WebView 展示。]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.ztianzeng.contextlens.insight.core.FileInsightManager"/>
+        <projectService serviceImplementation="com.ztianzeng.contextlens.insight.core.ContextCollector"/>
+        <projectService serviceImplementation="com.ztianzeng.contextlens.insight.core.CliInvocationBridge"/>
+        <projectService serviceImplementation="com.ztianzeng.contextlens.insight.core.InsightStorage"/>
+        <projectService serviceImplementation="com.ztianzeng.contextlens.insight.core.HtmlPreviewController"/>
+        <applicationService serviceImplementation="com.ztianzeng.contextlens.insight.settings.FileInsightSettings"/>
+        <toolWindow id="ContextLens"
+                    anchor="right"
+                    factoryClass="com.ztianzeng.contextlens.insight.ui.InsightToolWindowFactory"
+                    canCloseContents="false"/>
+        <applicationConfigurable instance="com.ztianzeng.contextlens.insight.settings.FileInsightSettingsConfigurable"
+                                 id="com.ztianzeng.contextlens.insight.settings"
+                                 displayName="ContextLens"/>
+    </extensions>
+
+    <actions>
+        <action id="ContextLens.AnalyzeFile"
+                class="com.ztianzeng.contextlens.insight.actions.AnalyzeFileAction"
+                text="Analyze with ContextLens"
+                description="Use Codex CLI via ContextLens to analyze the selected file">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>
