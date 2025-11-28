@@ -46,7 +46,13 @@ class FileInsightManager(
                 publisher.onProgress(project, requestId, indicator.text, 40)
                 val virtualFile = psiFile.virtualFile ?: return
                 val analysisTarget = storage.resolveAnalysisTarget(virtualFile)
-                val invocation = cliBridge.invoke(request, indicator, analysisTarget)
+                var streamingProgress = 40
+                val invocation = cliBridge.invoke(request, indicator, analysisTarget) { update ->
+                    val clipped = update.take(200)
+                    indicator.text = clipped
+                    streamingProgress = (streamingProgress + 1).coerceAtMost(75)
+                    publisher.onProgress(project, requestId, clipped, streamingProgress)
+                }
 
                 indicator.text = "Finalizing"
                 publisher.onProgress(project, requestId, indicator.text, 80)
