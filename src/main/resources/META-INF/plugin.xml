@@ -3,7 +3,7 @@
     <name>ContextLens</name>
     <vendor email="tianzeng@example.com">ContextLens</vendor>
 
-    <description><![CDATA[ContextLens 将 IDE 中的单个文件上下文打包交给 Codex，返回可跳转的洞察卡片并通过 React WebView 展示。]]></description>
+    <description><![CDATA[ContextLens plugin packages IDE file context for Codex analysis, returns navigable insight cards, and renders them via the React WebView。ContextLens 将 IDE 中的单个文件上下文打包交给 Codex，返回可跳转的洞察卡片并通过 React WebView 展示。]]></description>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>Git4Idea</depends>

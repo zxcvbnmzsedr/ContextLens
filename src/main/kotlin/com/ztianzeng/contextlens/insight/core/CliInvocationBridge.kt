@@ -3,6 +3,7 @@ package com.ztianzeng.contextlens.insight.core
 import com.google.gson.Gson
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.ztianzeng.contextlens.insight.model.CodexRequest
@@ -42,16 +43,7 @@ class CliInvocationBridge(
                 output.flush()
             }
 
-            var waited = 0L
-            while (waited < state.requestTimeoutSec) {
-                indicator.checkCanceled()
-                if (process.waitFor(1, TimeUnit.SECONDS)) break
-                waited++
-            }
-            if (waited >= state.requestTimeoutSec && process.isAlive) {
-                process.destroyForcibly()
-                throw IllegalStateException("Codex CLI timed out after ${state.requestTimeoutSec}s")
-            }
+            waitForCompletion(process, indicator)
 
             val stdout = process.inputStream.bufferedReader().readText()
             val stderr = process.errorStream.bufferedReader().readText()
@@ -81,6 +73,22 @@ class CliInvocationBridge(
                     log.warn("Failed to delete temporary Codex output ${outputPlan.outputFile}", ex)
                 }
             }
+        }
+    }
+
+    private fun waitForCompletion(process: Process, indicator: ProgressIndicator) {
+        try {
+            while (true) {
+                indicator.checkCanceled()
+                if (process.waitFor(1, TimeUnit.SECONDS)) {
+                    return
+                }
+            }
+        } catch (ex: ProcessCanceledException) {
+            if (process.isAlive) {
+                process.destroyForcibly()
+            }
+            throw ex
         }
     }
 

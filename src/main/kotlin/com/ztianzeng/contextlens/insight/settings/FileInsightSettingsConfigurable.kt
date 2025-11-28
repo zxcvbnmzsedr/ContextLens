@@ -20,7 +20,6 @@ class FileInsightSettingsConfigurable : Configurable {
     private val apiKeyField = JBTextField()
     private val apiUrlField = JBTextField()
     private val concurrencySpinner = JSpinner(SpinnerNumberModel(2, 1, 8, 1))
-    private val timeoutSpinner = JSpinner(SpinnerNumberModel(120, 30, 600, 10))
     private val outputRootField = JBTextField()
     private val overwriteCheck = JBCheckBox("Overwrite existing HTML output", true)
     private val logCheck = JBCheckBox("Write CLI logs to .analysis/logs", false)
@@ -31,7 +30,6 @@ class FileInsightSettingsConfigurable : Configurable {
         .addLabeledComponent("API Key", apiKeyField)
         .addLabeledComponent("API URL", apiUrlField)
         .addLabeledComponent("Max Concurrency", concurrencySpinner)
-        .addLabeledComponent("Timeout (sec)", timeoutSpinner)
         .addLabeledComponent(".analysis Root", outputRootField)
         .addComponent(overwriteCheck)
         .addComponent(logCheck)
@@ -54,7 +52,6 @@ class FileInsightSettingsConfigurable : Configurable {
             apiKeyField.text != settings.apiKey ||
             apiUrlField.text != settings.apiUrl ||
             (concurrencySpinner.value as Int) != settings.maxConcurrency ||
-            (timeoutSpinner.value as Int) != settings.requestTimeoutSec ||
             outputRootField.text != settings.analysisOutputRoot ||
             overwriteCheck.isSelected != settings.overwriteExistingOutput ||
             logCheck.isSelected != settings.enableCliLogs
@@ -65,7 +62,6 @@ class FileInsightSettingsConfigurable : Configurable {
         settings.apiKey = apiKeyField.text
         settings.apiUrl = apiUrlField.text
         settings.maxConcurrency = concurrencySpinner.value as Int
-        settings.requestTimeoutSec = timeoutSpinner.value as Int
         settings.analysisOutputRoot = outputRootField.text
         settings.overwriteExistingOutput = overwriteCheck.isSelected
         settings.enableCliLogs = logCheck.isSelected
@@ -81,7 +77,6 @@ class FileInsightSettingsConfigurable : Configurable {
         apiKeyField.text = settings.apiKey
         apiUrlField.text = settings.apiUrl
         concurrencySpinner.value = settings.maxConcurrency
-        timeoutSpinner.value = settings.requestTimeoutSec
         outputRootField.text = settings.analysisOutputRoot
         overwriteCheck.isSelected = settings.overwriteExistingOutput
         logCheck.isSelected = settings.enableCliLogs

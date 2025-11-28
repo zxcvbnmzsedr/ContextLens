@@ -30,11 +30,10 @@ class FileInsightSettings : PersistentStateComponent<FileInsightState> {
 
 data class FileInsightState(
     var codexPath: String = "codex",
-    var codexModel: String = "code-navigator",
+    var codexModel: String = "gpt-5.1-codex",
     var apiKey: String = "",
     var apiUrl: String = "",
     var maxConcurrency: Int = 2,
-    var requestTimeoutSec: Int = 120,
     var analysisOutputRoot: String = ".analysis",
     var overwriteExistingOutput: Boolean = true,
     var enableCliLogs: Boolean = false,

@@ -172,7 +172,7 @@
   | `insight:init` | WebView 初次加载 | `{ "config": { "version":"1.0.0","settings":{...} } }` |
   | `insight:progress` | 分析运行中 | `{ "message":"调用 Codex…","percentage":45 }` |
   | `insight:update` | 分析成功 | `{ "data": <Codex JSON> }` |
-  | `insight:error` | CLI 失败/超时 | `{ "code":"CLI_TIMEOUT","detail":"超过120s" }` |
+| `insight:error` | CLI 失败或被用户取消 | `{ "code":"CLI_ERROR","detail":"Codex 进程中止" }` |
 | `insight:history` | 用户查看历史记录 | `{ "items":[{"requestId":"..."}] }` |
 - **React → IDE 事件**：
   | 事件 | 说明 | body |
@@ -204,7 +204,6 @@
       var apiKey: String = "",
       var apiUrl: String = "",
       var maxConcurrency: Int = 2,
-      var requestTimeoutSec: Int = 120,
       var analysisOutputRoot: String = ".analysis",
       var overwriteExistingOutput: Boolean = true,
       var enableCliLogs: Boolean = true,
@@ -212,7 +211,7 @@
   )
   ```
 - **设置界面**：实现 `Configurable`，分为三个分组：
-  1. Codex：CLI 路径、模型、API Key/API URL、并发限制、超时。
+  1. Codex：CLI 路径、模型、API Key/API URL、并发限制。
   2. 输出与日志：配置 `.analysis` 输出根目录、是否自动覆盖旧的分析 HTML、是否写入 CLI 日志。
 - **变更监听**：`FileInsightSettings` 作为 `Topic<FileInsightSettingsListener>` 发布配置变化，`CliInvocationBridge` 等组件订阅以更新运行参数。
 - **目录管理**：初始化时检查 `analysisOutputRoot` 是否存在，若不存在则创建（尊重 `.gitignore`），并在输出前递归创建与原始源码相同的子目录结构。
@@ -245,7 +244,7 @@
     ```
     插件需根据 `retryAfter` 控制退避。
 - **超时与并发**：
-  - IDE 端设置调用超时 120s，超过则终止进程并提示用户。
+  - IDE 不再强制设置调用超时，若耗时较长可手动取消任务（取消后插件强制终止 CLI）。
   - 采用队列限流：默认同时只允许 2 个 Codex 请求；其余排队并在 UI 中显示等待状态。
 - **日志**：
   - CLI 的 `stderr` 会被捕获写入 `.analysis/logs/last-run.log`（可配置），敏感内容前置脱敏。
