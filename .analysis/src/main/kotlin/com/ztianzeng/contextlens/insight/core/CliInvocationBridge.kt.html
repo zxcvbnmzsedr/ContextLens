@@ -1,0 +1,194 @@
+<article>
+  <header>
+    <h1>CliInvocationBridge 分析</h1>
+    <p>该项目级服务封装了 Codex CLI 的调用流程，负责注入凭证、输出落盘以及 WebView 所需的 AGENTS.md 同步，是 IDE 中代码分析链路的执行枢纽。</p>
+  </header>
+
+  <section data-block="overview">
+    <h2>功能摘要</h2>
+    <ul>
+      <li><strong>类与职责</strong>：`CliInvocationBridge`（项目级 @Service）将 IDE 收集到的 `CodexRequest` 序列化并通过外部 codex CLI 执行，管理超时、日志与输出路径。</li>
+      <li><strong>输入</strong>：`CodexRequest`（文件上下文）、`ProgressIndicator`（用于取消检测）、可选的 `AnalysisTarget`（指向 `.analysis` 输出文件）。</li>
+      <li><strong>输出</strong>：`CliInvocationResult`，携带成功解析的 `CodexResponse`、实际命令行、原始 JSON 文本以及产物是否写回目标文件的标识。</li>
+      <li><strong>副作用</strong>：写入 `.codex/analysis/AGENTS.md`、根据配置创建/覆盖分析结果文件、将 CLI stderr 追加到日志、修改子进程环境。</li>
+    </ul>
+  </section>
+
+  <section data-block="call-graph">
+    <h2>调用关系</h2>
+    <ul>
+      <li><strong>调用方</strong>：`FileInsightManager.requestInsight` 在后台任务中收集 PSI 上下文后调用 `cliBridge.invoke`，用于完成单文件分析请求，位置 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/FileInsightManager.kt" data-line="24" data-end-line="55">FileInsightManager.kt:24-55</a>。</li>
+      <li><strong>依赖 - 配置</strong>：`FileInsightSettings` 提供 CLI 路径、模型名、API Key、超时及输出策略，决定 `buildCommand` 与 `resolveOutputFile` 的行为，位置 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="24" data-end-line="32">CliInvocationBridge.kt:24-32</a>。</li>
+      <li><strong>依赖 - 存储</strong>：`InsightStorage` 用于写入 CLI stderr 日志并在调用前选定 `AnalysisTarget` 输出文件（由调用方负责解析），相关实现见 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="58" data-end-line="61">CliInvocationBridge.kt:58-61</a> 与 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/InsightStorage.kt" data-line="16" data-end-line="54">InsightStorage.kt:16-54</a>。</li>
+      <li><strong>依赖 - 资源</strong>：`AgentPromptProvider` 在首次调用时从 `prompts/AGENTS.md` 读取最新代理指令并写入 `~/.codex/analysis/AGENTS.md`，确保 CLI 能加载相同提示，位置 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="146" data-end-line="219">CliInvocationBridge.kt:146-219</a>。</li>
+      <li><strong>外部系统</strong>：`ProcessBuilder` 启动 codex CLI，桥接标准输入/输出并根据 `ProgressIndicator` 轮询超时，用于确保 IDE 可取消长时间任务，位置 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="33" data-end-line="65">CliInvocationBridge.kt:33-65</a>。</li>
+    </ul>
+  </section>
+
+  <section data-block="core-code">
+    <h2>核心代码</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>关键区域</th>
+          <th>位置</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CLI 调度主流程</td>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="27" data-end-line="85">CliInvocationBridge.kt:27-85</a></td>
+          <td>`invoke` 负责准备 CLI home/输出文件、构建命令、写入 JSON 请求到 stdin、轮询超时并收集 stdout/stderr，最后返回 `CliInvocationResult`，并在 finally 中回收临时文件。</td>
+        </tr>
+        <tr>
+          <td>命令与环境构建</td>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="87" data-end-line="144">CliInvocationBridge.kt:87-144</a></td>
+          <td>`buildCommand` 与 `defaultArguments` 生成 `codex exec` 所需参数，`setupEnvironment` 注入 `CODEX_API_KEY`、`OPENAI_BASE_URL`、`CODEX_HOME` 并在必要时扩展 PATH，保证 CLI 能在用户项目目录执行。</td>
+        </tr>
+        <tr>
+          <td>CLI Home 与 AGENTS.md 同步</td>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="146" data-end-line="173">CliInvocationBridge.kt:146-173</a></td>
+          <td>`prepareCliHome` 创建 `~/.codex/analysis`，调用 `syncAgentsFile` 将嵌入资源的提示文案写到 AGENTS.md，确保 CLI 的 agent 配置与插件保持一致。</td>
+        </tr>
+        <tr>
+          <td>输出文件与读取策略</td>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="175" data-end-line="197">CliInvocationBridge.kt:175-197</a></td>
+          <td>`resolveOutputFile` 根据配置决定覆写目标 `.analysis` 文件或使用临时文件，`loadOutput` 保证优先从文件读取结果，若缺失则回退到 stdout，并抛错提示产物丢失。</td>
+        </tr>
+        <tr>
+          <td>Agent 资源加载</td>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt" data-line="212" data-end-line="219">CliInvocationBridge.kt:212-219</a></td>
+          <td>`AgentPromptProvider` 通过类加载器读取 `prompts/AGENTS.md` 并缓存，避免频繁 IO，同时保证 CLI home 同步文件可用。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section data-block="method-notes">
+    <h2>方法注释</h2>
+    <ul>
+      <li><strong>invoke(request, indicator, target)</strong>：接收 Codex 请求与进度指示器，建立外部进程执行并返回 `CliInvocationResult`；会写入 stdin、监控超时并管理输出文件。</li>
+      <li><strong>buildCommand(codexPath, model, outputFile)</strong>：将 CLI 可执行路径与默认参数组合成命令数组，确保结果以 JSON 写入给定文件。</li>
+      <li><strong>defaultArguments(model, outputFile)</strong>：定义 `codex exec` 固定参数序列，包含模型名、输出路径以及 `-`（表示读取 stdin）。</li>
+      <li><strong>setupEnvironment(processBuilder, apiKey, apiUrl, cliHome, codexPath)</strong>：配置进程环境变量、COD-EX Home、必要时扩展 PATH，同时将工作目录指向当前项目。</li>
+      <li><strong>extendPathIfNeeded(env, codexPath)</strong>：若 CLI 路径为绝对路径，则将其父目录追加到 PATH，避免子进程内部再次调用 CLI 失败。</li>
+      <li><strong>prepareCliHome()</strong>：确保 `~/.codex/analysis` 存在并触发 AGENTS.md 同步，返回该目录 Path。</li>
+      <li><strong>syncAgentsFile(targetHome)</strong>：把插件打包的 `prompts/AGENTS.md` 写入 CLI home，若提示为空则记录 warning。</li>
+      <li><strong>resolveOutputFile(target)</strong>：根据 `AnalysisTarget` 和“允许覆写”配置决定输出路径，必要时回退到临时文件并标记需清理。</li>
+      <li><strong>loadOutput(outputFile, stdoutFallback)</strong>：读取 CLI 产物文件，缺失时使用 stdout 文本；两者都不可用会抛出 `IllegalStateException`。</li>
+    </ul>
+  </section>
+
+  <section data-block="api-docs">
+    <h2>API 文档</h2>
+
+    <div>
+      <p>名称: CliInvocationBridge.invoke</p>
+      <p>描述: 以 CodexRequest 为输入启动外部 codex CLI，注入凭证与输出配置，并在超时与取消机制保护下返回结构化结果。</p>
+      <p>参数:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>参数名称</th>
+            <th>参数类型</th>
+            <th>是否必填</th>
+            <th>默认值</th>
+            <th>使用描述</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>request</td>
+            <td>CodexRequest</td>
+            <td>是</td>
+            <td>无</td>
+            <td>包含文件路径、语言及内容，将被序列化到 CLI stdin。</td>
+          </tr>
+          <tr>
+            <td>indicator</td>
+            <td>ProgressIndicator</td>
+            <td>是</td>
+            <td>无</td>
+            <td>供桥接层检测取消/更新文本，避免 IDE 卡死。</td>
+          </tr>
+          <tr>
+            <td>target</td>
+            <td>AnalysisTarget?</td>
+            <td>否</td>
+            <td>null</td>
+            <td>指定 `.analysis` 产物位置；为空时自动创建临时文件并在完成后清理。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">
+val bridge = project.getService(CliInvocationBridge::class.java)
+val target = project.getService(InsightStorage::class.java)
+    .resolveAnalysisTarget(psiFile.virtualFile!!)
+val result = bridge.invoke(request, indicator, target)
+println(result.response.raw)
+      </code></pre>
+    </div>
+
+    <div>
+      <p>名称: CliInvocationResult</p>
+      <p>描述: 封装 CLI 调用结果，包括响应体、命令行参数、原始输出与产物写入状态，便于 UI 和日志系统后续消费。</p>
+      <p>参数:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>参数名称</th>
+            <th>参数类型</th>
+            <th>是否必填</th>
+            <th>默认值</th>
+            <th>使用描述</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>response</td>
+            <td>CodexResponse</td>
+            <td>是</td>
+            <td>无</td>
+            <td>解析后的高层响应，通常用于 UI 展示。</td>
+          </tr>
+          <tr>
+            <td>commandLine</td>
+            <td>List&lt;String&gt;</td>
+            <td>是</td>
+            <td>无</td>
+            <td>实际执行的命令行，用于诊断或回放。</td>
+          </tr>
+          <tr>
+            <td>rawOutput</td>
+            <td>String</td>
+            <td>是</td>
+            <td>无</td>
+            <td>CLI 产出的原始 JSON 文本。</td>
+          </tr>
+          <tr>
+            <td>wroteToTarget</td>
+            <td>Boolean</td>
+            <td>是</td>
+            <td>无</td>
+            <td>指示结果是否写入 `AnalysisTarget`（true）或临时文件（false）。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">
+fun handleResult(invocation: CliInvocationResult) {
+    if (invocation.wroteToTarget) {
+        println("HTML ready, command: ${invocation.commandLine.joinToString(" ")}")
+    }
+    renderPanel(invocation.response)
+}
+      </code></pre>
+    </div>
+  </section>
+
+  <footer>
+    <p>信息基于仓库当前代码：`src/main/kotlin/com/ztianzeng/contextlens/insight/core/CliInvocationBridge.kt` 及其直接调用关系，若外部依赖更新需同步复核。</p>
+  </footer>
+</article>

@@ -46,3 +46,6 @@ bin/
 .gradle-user/
 webview/node_modules/
 webview/dist/
+/webview/src/*.js
+/src/main/resources/webview/contextlens/assets/
+/.analysis/logs/last-run.log

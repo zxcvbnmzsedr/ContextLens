@@ -1,3 +1,5 @@
+import org.gradle.language.jvm.tasks.ProcessResources
+
 plugins {
     kotlin("jvm") version "1.9.23"
     id("org.jetbrains.intellij") version "1.17.2"
@@ -27,7 +29,7 @@ dependencies {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("243.*")
+        untilBuild.set("252.*")
     }
 
     register<Copy>("copyWebview") {
@@ -38,6 +40,14 @@ tasks {
         from(webviewDist)
         into(targetDir)
         onlyIf { webviewDist.asFile.exists() }
+    }
+
+    named<ProcessResources>("processResources") {
+        dependsOn("copyWebview")
+    }
+
+    buildSearchableOptions {
+        enabled = false
     }
 
     buildPlugin {

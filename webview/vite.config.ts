@@ -6,7 +6,8 @@ export default defineConfig({
   base: '',
   build: {
     outDir: 'dist',
-    sourcemap: false
+    sourcemap: false,
+    crossOrigin: false
   },
   server: {
     port: 4173

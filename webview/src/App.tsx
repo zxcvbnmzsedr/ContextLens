@@ -118,7 +118,12 @@ const selectContent = (raw?: string): string => {
     if (looksLikeHtml) {
         return raw;
     }
-    return marked.parse(raw, {mangle: false, headerIds: false});
+    const html = marked.parse(raw);
+    if (typeof html === 'string') {
+        return html;
+    }
+    console.warn('[ContextLens] Marked returned async output, falling back to raw markdown'); // fallback guard
+    return raw ?? '';
 };
 
 const enhanceFileReferences = (html: string): string => {
@@ -171,8 +176,7 @@ const enhanceFileReferences = (html: string): string => {
 const createFileLink = (path: string, startLine: string, endLine?: string): HTMLAnchorElement => {
     const anchor = document.createElement('a');
     const lineLabel = endLine ? `${startLine}-${endLine}` : startLine;
-    const displayName = `${extractFileName(path)}:${lineLabel}`;
-    anchor.textContent = displayName;
+    anchor.textContent = `${extractFileName(path)}:${lineLabel}`;
     anchor.href = '#';
     anchor.dataset.fileLink = 'true';
     anchor.dataset.file = path;

@@ -32,7 +32,7 @@ class CliInvocationBridge(
 
         try {
             val processBuilder = ProcessBuilder(commandLine)
-            setupEnvironment(processBuilder, state.apiKey, state.apiUrl, cliHome)
+            setupEnvironment(processBuilder, state.apiKey, state.apiUrl, cliHome, state.codexPath)
             log.info("Executing Codex command: ${commandLine.joinToString(" ")}")
 
             val process = processBuilder.start()
@@ -102,7 +102,13 @@ class CliInvocationBridge(
         "-"
     )
 
-    private fun setupEnvironment(processBuilder: ProcessBuilder, apiKey: String, apiUrl: String, cliHome: Path) {
+    private fun setupEnvironment(
+        processBuilder: ProcessBuilder,
+        apiKey: String,
+        apiUrl: String,
+        cliHome: Path,
+        codexPath: String
+    ) {
         val env = processBuilder.environment()
         val resolvedKey = apiKey.trim().ifBlank { System.getenv("CODEX_API_KEY")?.trim().orEmpty() }
         if (resolvedKey.isBlank()) {
@@ -116,7 +122,25 @@ class CliInvocationBridge(
             env["CODEX_API_URL"] = apiUrl
         }
         env["CODEX_HOME"] = cliHome.toString()
+        extendPathIfNeeded(env, codexPath)
         processBuilder.directory(project.basePath?.let { File(it) })
+    }
+
+    private fun extendPathIfNeeded(env: MutableMap<String, String>, codexPath: String) {
+        val codexParent = try {
+            val path = Path.of(codexPath)
+            if (path.isAbsolute) path.parent else null
+        } catch (_: Exception) {
+            null
+        }
+        if (codexParent == null) return
+        val current = env["PATH"].orEmpty()
+        val separator = File.pathSeparator
+        val segments = current.split(separator).filter { it.isNotBlank() }.toMutableList()
+        if (!segments.contains(codexParent.toString())) {
+            segments.add(codexParent.toString())
+            env["PATH"] = segments.joinToString(separator)
+        }
     }
 
     private fun prepareCliHome(): Path {

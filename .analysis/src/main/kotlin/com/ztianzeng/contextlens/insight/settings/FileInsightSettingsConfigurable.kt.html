@@ -1,0 +1,121 @@
+<article>
+  <header>
+    <h1>FileInsightSettingsConfigurable 分析</h1>
+    <p>该报告聚焦 IntelliJ 插件 ContextLens 中的 FileInsightSettingsConfigurable 类，梳理其角色、调用关系与实现细节。</p>
+  </header>
+  <section data-block="summary">
+    <h2>功能摘要</h2>
+    <p>FileInsightSettingsConfigurable 实现 IntelliJ 的 Configurable 接口，为 ContextLens CLI 调用链提供一个集中配置界面，核心逻辑是将表单控件与持久化状态对象 FileInsightState 绑定，并在用户确认后同步到所有打开的项目。</p>
+    <ul>
+      <li><strong>类职责</strong>：构建带有 CLI 路径、模型、API 凭据、并发度、超时、输出路径等控件的 Swing 面板，并响应 Settings 对话框生命周期（创建、脏检查、应用、重置），对应 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="18" data-end-line="88">FileInsightSettingsConfigurable.kt:18-88</a>。</li>
+      <li><strong>输入</strong>：依赖单例服务 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettings.kt" data-line="9" data-end-line="42">FileInsightSettings.kt:9-42</a> 暴露的状态对象，以及用户在 UI 中输入的各项文本/数值。</li>
+      <li><strong>输出</strong>：经 apply() 后修改 FileInsightState 内字段（CLI 路径、模型、API key/url、maxConcurrency、requestTimeoutSec、analysisOutputRoot、overwriteExistingOutput、enableCliLogs），同时向 message bus 广播设置变更。</li>
+      <li><strong>副作用</strong>：通过 ProjectManager 遍历所有打开项目并同步发布 FileInsightSettings.TOPIC，未来监听者（尚未实现）可据此刷新 CLI 行为；当前 UI 未暴露 FileInsightState.enableGitDiff，意味着该设置仍停留在默认值。</li>
+      <li><strong>UI 结构</strong>：使用 FormBuilder 顺序堆叠文本框、数字 spinner 以及开关复选框，并包裹在 BorderLayout.NORTH 的 panel 中，见 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="28" data-end-line="42">FileInsightSettingsConfigurable.kt:28-42</a>。</li>
+    </ul>
+  </section>
+  <section data-block="call-graph">
+    <h2>调用关系</h2>
+    <ul>
+      <li><strong>调用方</strong>：IDE Settings / Preferences 在插件被注册为 <code>applicationConfigurable</code> 时实例化该类，并在用户打开 “ContextLens” 设置页时调用 createComponent()/reset()，见 <a data-file-link="true" data-file="src/main/resources/META-INF/plugin.xml" data-line="11" data-end-line="25">META-INF/plugin.xml:11-25</a>。</li>
+      <li><strong>调用方</strong>：Settings 框架在输入变更后调用 isModified() 去判定 “Apply” 按钮可用性，以及在用户提交时调用 apply()。</li>
+      <li><strong>被调用依赖</strong>：FileInsightSettings 服务提供当前持久化状态（getInstance().current），并作为 apply()/reset() 的读写目标；依赖来源 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettings.kt" data-line="9" data-end-line="42">FileInsightSettings.kt:9-42</a>。</li>
+      <li><strong>被调用依赖</strong>：ProjectManager.OpenProjects + MessageBus 保证 apply() 的广播能覆盖多项目场景，确保例如 CliInvocationBridge 等潜在监听者在未来可响应配置变化，位置 <a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="62" data-end-line="75">FileInsightSettingsConfigurable.kt:62-75</a>。</li>
+    </ul>
+  </section>
+  <section data-block="core-code">
+    <h2>核心代码</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>位置</th>
+          <th>职责说明</th>
+          <th>实现要点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="18" data-end-line="42">FileInsightSettingsConfigurable.kt:18-42</a></td>
+          <td>声明全部 UI 控件并用 FormBuilder 组装出带标签的面板。</td>
+          <td>针对文本、Spinner、复选框分配默认值，Spinner 限制并发与超时上下限，最终嵌入 BorderLayout.NORTH 避免面板拉伸。</td>
+        </tr>
+        <tr>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="46" data-end-line="60">FileInsightSettingsConfigurable.kt:46-60</a></td>
+          <td>createComponent() 初始化 UI 并将现有设置灌入；isModified() 实现逐字段脏检查。</td>
+          <td>使用 reset() 复用灌值逻辑；isModified() 直接比较文本/布尔/数值，Kotlin 智能转换 spinner.value 为 Int。</td>
+        </tr>
+        <tr>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="62" data-end-line="75">FileInsightSettingsConfigurable.kt:62-75</a></td>
+          <td>apply() 将 UI 值写回 FileInsightState，并向所有项目广播变更。</td>
+          <td>逐字段赋值后遍历 ProjectManager.getInstance().openProjects，通过 messageBus.syncPublisher(FileInsightSettings.TOPIC) 通知监听者。</td>
+        </tr>
+        <tr>
+          <td><a data-file-link="true" data-file="src/main/kotlin/com/ztianzeng/contextlens/insight/settings/FileInsightSettingsConfigurable.kt" data-line="78" data-end-line="87">FileInsightSettingsConfigurable.kt:78-87</a></td>
+          <td>reset() 把持久化状态重新填充到 UI，支持 Settings “Reset” 操作。</td>
+          <td>严格覆盖全部控件，确保 isModified() 与 apply() 始终针对一致字段；未覆盖 FileInsightState.enableGitDiff，因为 UI 未提供该选项。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section data-block="method-notes">
+    <h2>方法注释</h2>
+    <ul>
+      <li><strong>getDisplayName()</strong>：无参、返回常量字符串，用于 Settings 左侧菜单，无副作用。</li>
+      <li><strong>createComponent()</strong>：无参，返回配置界面的根面板；副作用是调用 reset() 以确保控件内是最新状态。</li>
+      <li><strong>isModified()</strong>：无参、返回布尔值，通过逐字段比较当前控件值与 FileInsightState 判断是否需要启用 Apply 按钮。</li>
+      <li><strong>apply()</strong>：无参，将控件值写回 FileInsightState 并向所有 Project messageBus 发送 FileInsightSettings.TOPIC 事件；副作用是可触发潜在监听者执行刷新。</li>
+      <li><strong>reset()</strong>：无参，把 FileInsightState 的值重新设置到全部控件；副作用是丢弃未应用的用户输入。</li>
+    </ul>
+  </section>
+  <section data-block="api-docs">
+    <h2>API 文档</h2>
+    <div>
+      <p>名称: getDisplayName</p>
+      <p>描述: 返回 Settings 面板左侧显示的名字，IDE 用于在搜索和导航中标识该配置页。</p>
+      <p>参数: 无</p>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">val configurable = FileInsightSettingsConfigurable()
+println(configurable.displayName) // 调用 getDisplayName()</code></pre>
+    </div>
+    <div>
+      <p>名称: createComponent</p>
+      <p>描述: 构建并返回 ContextLens 配置界面的 Swing 组件，内部会同步现有设置值。</p>
+      <p>参数: 无</p>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">val configurable = FileInsightSettingsConfigurable()
+val ui: JComponent = configurable.createComponent()
+// 将 ui 嵌入到宿主设置对话框
+hostPanel.add(ui)</code></pre>
+    </div>
+    <div>
+      <p>名称: isModified</p>
+      <p>描述: 判断 UI 控件与 FileInsightState 的值是否存在差异，用于控制 Apply/OK 按钮的启用。</p>
+      <p>参数: 无</p>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">if (configurable.isModified) { // Kotlin 会调用 isModified()
+    // 启用提交按钮
+}</code></pre>
+    </div>
+    <div>
+      <p>名称: apply</p>
+      <p>描述: 将当前 UI 值写入 FileInsightState，并广播 FileInsightSettings.TOPIC，确保所有项目的 CLI 管线获取最新配置。</p>
+      <p>参数: 无</p>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">if (configurable.isModified) {
+    configurable.apply()
+    // 现在各项目可监听 FileInsightSettings.TOPIC 响应变化
+}</code></pre>
+    </div>
+    <div>
+      <p>名称: reset</p>
+      <p>描述: 用持久化状态覆盖 UI 控件，撤销未提交的用户输入。</p>
+      <p>参数: 无</p>
+      <p>使用示例:</p>
+      <pre><code class="language-kotlin">configurable.reset()
+formPanel.revalidate()</code></pre>
+    </div>
+  </section>
+  <footer>
+    <p>备注：目前仓库中未实现任何 FileInsightSettingsListener 监听者，因此 apply() 的广播主要为未来扩展保留；FileInsightState.enableGitDiff 尚未暴露在 UI，可根据需求增加控件维持一致性。</p>
+  </footer>
+</article>
