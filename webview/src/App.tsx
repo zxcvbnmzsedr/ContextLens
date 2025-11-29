@@ -12,6 +12,8 @@ type InsightState = {
     status: string;
     rawJson?: any;
     content?: string;
+    errorCode?: string;
+    filePath?: string;
 };
 
 type InsightConfig = {
@@ -33,21 +35,32 @@ const App = () => {
                 return;
             }
             if (payload.event === 'insight:progress') {
-                setState((prev) => ({...prev, status: `${payload.body.message} ${payload.body.percentage}%`}));
+                setState((prev) => ({
+                    ...prev,
+                    status: `${payload.body.message} ${payload.body.percentage}%`,
+                    errorCode: undefined
+                }));
             }
             if (payload.event === 'insight:update') {
                 const body = payload.body ?? {};
-                setState({
+                setState((prev) => ({
                     status: body.status === 'cached' ? '已加载 HTML 缓存' : '分析完成',
                     rawJson: body,
-                    content: body.raw ?? ''
-                });
+                    content: body.raw ?? '',
+                    errorCode: undefined,
+                    filePath: typeof body.filePath === 'string' ? body.filePath : prev.filePath
+                }));
             }
             if (payload.event === 'insight:error') {
+                const body = payload.body ?? {};
+                const rawContext = body.context;
+                const context = typeof rawContext === 'object' && rawContext !== null ? rawContext : {};
                 setState((prev) => ({
-                    status: payload.body.message ?? '发生错误',
+                    status: body.message ?? '发生错误',
                     rawJson: prev.rawJson,
-                    content: prev.content
+                    content: prev.content,
+                    errorCode: typeof body.code === 'string' ? body.code : undefined,
+                    filePath: typeof context.filePath === 'string' ? context.filePath : prev.filePath
                 }));
             }
         };
@@ -55,11 +68,29 @@ const App = () => {
         return () => window.removeEventListener('contextlens-insight', listener as EventListener);
     }, []);
 
+    const handleAnalyze = useCallback(
+        (filePath: string) => {
+            if (!filePath || !window.intellijApi) return;
+            window.intellijApi.postMessage(
+                JSON.stringify({
+                    event: 'insight:refresh',
+                    requestId: `refresh-${Date.now()}`,
+                    body: {filePath}
+                })
+            );
+            setState((prev) => ({...prev, status: '正在重新分析...', errorCode: undefined}));
+        },
+        []
+    );
+
     return (
         <div className="container">
             <section className="card">
                 <h2>ContextLens</h2>
                 <p>{state.status}</p>
+                {state.errorCode === 'HTML_CACHE_MISSING' && state.filePath && (
+                    <button onClick={() => handleAnalyze(state.filePath!)}>进行分析</button>
+                )}
             </section>
             {state.content && state.content.trim().length > 0 && (
                 <section className="card">

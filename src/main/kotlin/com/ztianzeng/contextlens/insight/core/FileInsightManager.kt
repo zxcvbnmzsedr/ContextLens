@@ -22,6 +22,7 @@ class FileInsightManager(
     private val log = Logger.getInstance(FileInsightManager::class.java)
 
     fun requestInsight(psiFile: PsiFile, requestId: String = UUID.randomUUID().toString()) {
+        val sourceFilePath = psiFile.virtualFile?.path
         object : Task.Backgroundable(project, "Analyzing ${psiFile.name}", true) {
             override fun run(indicator: ProgressIndicator) {
                 val publisher = project.messageBus.syncPublisher(InsightTopics.INSIGHT_EVENTS)
@@ -63,13 +64,17 @@ class FileInsightManager(
 
             override fun onThrowable(error: Throwable) {
                 log.warn("Failed to analyze file", error)
-                project.messageBus.syncPublisher(InsightTopics.INSIGHT_EVENTS)
-                    .onError(project, requestId, error.message ?: "Unknown error")
+                publishError(requestId, error.message ?: "Unknown error", sourceFilePath)
             }
 
             override fun onCancel() {
+                publishError(requestId, "Analysis cancelled", sourceFilePath)
+            }
+
+            private fun publishError(reqId: String, message: String, filePath: String?) {
+                val context = filePath?.let { mapOf("filePath" to it) } ?: emptyMap()
                 project.messageBus.syncPublisher(InsightTopics.INSIGHT_EVENTS)
-                    .onError(project, requestId, "Analysis cancelled")
+                    .onError(project, reqId, message, context = context)
             }
         }.queue()
     }

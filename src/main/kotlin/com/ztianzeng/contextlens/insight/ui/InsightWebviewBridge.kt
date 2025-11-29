@@ -100,8 +100,21 @@ class InsightWebviewBridge(
         send("insight:update", result.requestId, result.response)
     }
 
-    override fun onError(project: Project, requestId: String, error: String) {
-        send("insight:error", requestId, mapOf("message" to error))
+    override fun onError(
+        project: Project,
+        requestId: String,
+        error: String,
+        code: String?,
+        context: Map<String, Any?>
+    ) {
+        val payload = mutableMapOf<String, Any>("message" to error)
+        if (!code.isNullOrBlank()) {
+            payload["code"] = code
+        }
+        if (context.isNotEmpty()) {
+            payload["context"] = context
+        }
+        send("insight:error", requestId, payload)
     }
 
     private fun send(event: String, requestId: String, body: Any) {

@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
+import com.ztianzeng.contextlens.insight.events.InsightErrorCodes
 import com.ztianzeng.contextlens.insight.events.InsightTopics
 import com.ztianzeng.contextlens.insight.model.CodexResponse
 import com.ztianzeng.contextlens.insight.model.FileInsightResult
@@ -32,7 +33,13 @@ class HtmlPreviewController(private val project: Project) : FileEditorManagerLis
         val requestId = "preview:${file.path}"
         val publisher = project.messageBus.syncPublisher(InsightTopics.INSIGHT_EVENTS)
         if (htmlPath == null) {
-            publisher.onError(project, requestId, "未找到该文件的 HTML 分析缓存")
+            publisher.onError(
+                project,
+                requestId,
+                "未找到该文件的 HTML 分析缓存",
+                InsightErrorCodes.HTML_CACHE_MISSING,
+                mapOf("filePath" to file.path)
+            )
             return
         }
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -40,7 +47,13 @@ class HtmlPreviewController(private val project: Project) : FileEditorManagerLis
                 Files.readString(htmlPath, StandardCharsets.UTF_8)
             } catch (ex: Exception) {
                 log.warn("Failed to read html file ${'$'}htmlPath", ex)
-                publisher.onError(project, requestId, "读取 HTML 失败：${'$'}{ex.message}")
+                publisher.onError(
+                    project,
+                    requestId,
+                    "读取 HTML 失败：${ex.message}",
+                    InsightErrorCodes.HTML_CACHE_READ_FAILED,
+                    mapOf("filePath" to file.path)
+                )
                 return@executeOnPooledThread
             }
             val response = CodexResponse(status = "cached", raw = html)
