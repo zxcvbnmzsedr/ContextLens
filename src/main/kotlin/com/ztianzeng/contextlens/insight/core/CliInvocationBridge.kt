@@ -329,13 +329,3 @@ private data class CapturedOutput(
     val stdout: String,
     val stderr: String
 )
-
-private object AgentPromptProvider {
-    val prompt: String by lazy {
-        CliInvocationBridge::class.java.classLoader
-            .getResourceAsStream("prompts/AGENTS.md")
-            ?.bufferedReader(StandardCharsets.UTF_8)
-            ?.use { it.readText().trim() }
-            .orEmpty()
-    }
-}

@@ -37,7 +37,8 @@ data class FileInsightState(
     var analysisOutputRoot: String = ".analysis",
     var overwriteExistingOutput: Boolean = true,
     var enableCliLogs: Boolean = false,
-    var enableGitDiff: Boolean = true
+    var enableGitDiff: Boolean = true,
+    var agentPrompt: String = ""
 )
 
 fun interface FileInsightSettingsListener {
