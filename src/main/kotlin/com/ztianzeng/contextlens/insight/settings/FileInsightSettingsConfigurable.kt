@@ -47,15 +47,15 @@ class FileInsightSettingsConfigurable : Configurable {
     }
 
     private val formPanel: JPanel = FormBuilder.createFormBuilder()
-        .addLabeledComponent("CLI Path", codexPathField)
+        .addLabeledComponent("CLI path", codexPathField)
         .addLabeledComponent("Model", codexModelField)
-        .addLabeledComponent("API Key", apiKeyField)
+        .addLabeledComponent("API key", apiKeyField)
         .addLabeledComponent("API URL", apiUrlField)
-        .addLabeledComponent("Max Concurrency", concurrencySpinner)
-        .addLabeledComponent(".analysis Root", outputRootField)
+        .addLabeledComponent("Max concurrency", concurrencySpinner)
+        .addLabeledComponent(".analysis root", outputRootField)
         .addComponent(overwriteCheck)
         .addComponent(logCheck)
-        .addLabeledComponent("Agent Prompt", agentPromptPanel)
+        .addLabeledComponent("Agent prompt", agentPromptPanel)
         .panel
 
     private val panel: JPanel = JPanel(BorderLayout()).apply {
